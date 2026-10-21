@@ -91,6 +91,21 @@ async def run_step(page, st, n):
     await asyncio.sleep(random.uniform(0.5, 2))
 
 
+def build_accounts():
+    """userplay001..N. Default password from TEST_PASSWORD.
+    A secret named TEST_PASSWORD_008 overrides account 008, and so on."""
+    pw = os.environ.get("TEST_PASSWORD", "")
+    pat = CFG.get("account_pattern")
+    accounts = []
+    if pat and pw:
+        for i in range(1, CFG.get("account_count", 0) + 1):
+            accounts.append({
+                "email": pat.format(i),
+                "password": os.environ.get(f"TEST_PASSWORD_{i:03d}") or pw,
+            })
+    return accounts
+
+
 async def bot(p, browser, n):
     gid = (GROUP - 1) * BOTS + n  # unique bot number 0..49
     name = DEVICES[gid % len(DEVICES)]
@@ -118,10 +133,7 @@ async def bot(p, browser, n):
         for st in CFG.get("steps", []):
             await run_step(page, st, n)
         # logged-in part: each bot uses its own test account
-        pw = os.environ.get("TEST_PASSWORD", "")
-        pat = CFG.get("account_pattern")
-        accounts = [{"email": pat.format(i), "password": pw}
-                    for i in range(1, CFG.get("account_count", 0) + 1)] if pat and pw else []
+        accounts = build_accounts()
         if CFG.get("login") and gid < len(accounts):
             acc = accounts[gid]
             await do_login(page, acc["email"], acc["password"])
@@ -148,4 +160,13 @@ async def main():
         await check.close()
         if WAVE_MIN:
             wait = (GROUP - 1) * WAVE_MIN * 60
-            print(f"Wave {GROUP}: waiting {wait/60:.
+            print(f"Wave {GROUP}: waiting {wait/60:.0f} min")
+            await asyncio.sleep(wait)
+        await asyncio.gather(*(bot(p, browser, n) for n in range(BOTS)))
+        await browser.close()
+    passed = sum(r["status"] == "PASS" for r in results)
+    print(f"GROUP {GROUP}: {passed}/{len(results)} bots passed")
+    with open(f"results_{GROUP}.json", "w") as f:
+        json.dump(results, f, indent=2)
+
+asyncio.run(main())

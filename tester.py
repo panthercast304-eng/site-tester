@@ -23,6 +23,22 @@ async def verify_owner(ctx):
         return False
 
 
+async def find_pages(page, limit):
+    """Open the home page and collect internal links (same site only)."""
+    root = BASE.rstrip("/")
+    await page.goto(root + "/", timeout=30000)
+    hrefs = await page.eval_on_selector_all(
+        "a[href]", "els => els.map(e => e.href)")
+    found = []
+    for h in hrefs:
+        h = h.split("#")[0].split("?")[0]
+        if h.startswith(root) and h != root + "/" and h != root:
+            path = h[len(root):]
+            if path not in found and not path.endswith((".pdf", ".zip", ".png", ".jpg")):
+                found.append(path)
+    return ["/"] + found[:limit]
+
+
 async def bot(p, browser, n):
     gid = (GROUP - 1) * BOTS + n  # unique bot number 0..49
     name = DEVICES[gid % len(DEVICES)]
@@ -31,7 +47,7 @@ async def bot(p, browser, n):
     acc = accs[gid % len(accs)] if accs else None
     ctx = await browser.new_context(**{**opts, "user_agent": UA})
     page = await ctx.new_page()
-    errors, problems, timings = [], [], {}
+    errors, problems, timings, ads = [], [], {}, {}
     page.on("console", lambda m: errors.append(m.text[:100]) if m.type == "error" else None)
     try:
         await asyncio.sleep(random.uniform(0, 5))  # stagger starts
@@ -43,7 +59,10 @@ async def bot(p, browser, n):
             await page.fill(L["password"], acc["password"])
             await page.click(L["submit"])
             await page.wait_for_selector(L["success"], timeout=15000)
-        for s in CFG.get("sections", ["/"]):
+        pages = CFG.get("sections", ["/"])
+        if CFG.get("crawl"):
+            pages = await find_pages(page, CFG.get("max_pages", 15))
+        for s in pages:
             t = time.time()
             r = await page.goto(BASE + s, timeout=30000)
             ms = int((time.time() - t) * 1000)
@@ -51,6 +70,9 @@ async def bot(p, browser, n):
             if r.status >= 400:
                 problems.append(f"{s} returned {r.status}")
             await page.mouse.wheel(0, random.randint(300, 1200))
+            for sel in CFG.get("ad_selectors", []):  # check only, never click
+                cnt = await page.locator(sel).count()
+                ads[f"{s} {sel}"] = cnt
             await asyncio.sleep(random.uniform(1, 4))
         for st in CFG.get("steps", []):
             d = st["do"]
@@ -64,9 +86,9 @@ async def bot(p, browser, n):
     except Exception as e:
         problems.append(str(e)[:150])
     status = "PASS" if not problems else "FAIL"
-    print(f"[bot {gid}] {name} {status} console_errors={len(errors)} {problems}")
+    print(f"[bot {gid}] {name} {status} pages={len(timings)} console_errors={len(errors)} ads={ads} {problems}")
     results.append({"bot": gid, "device": name, "status": status,
-                    "timings_ms": timings, "console_errors": errors,
+                    "timings_ms": timings, "ad_slots": ads, "console_errors": errors,
                     "problems": problems})
     await ctx.close()
 

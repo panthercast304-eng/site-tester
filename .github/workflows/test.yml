@@ -5,9 +5,14 @@ on:
       url:
         description: Site to test (leave empty to use config)
         required: false
+      wave_minutes:
+        description: Leave 0 (the login gap already spreads the bots)
+        required: false
+        default: "0"
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -24,6 +29,9 @@ jobs:
           URL: ${{ github.event.inputs.url }}
           GROUP: ${{ matrix.group }}
           BOTS: "10"
+          WAVE_MINUTES: ${{ github.event.inputs.wave_minutes }}
+          LOGIN_GAP_SECONDS: "90"
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

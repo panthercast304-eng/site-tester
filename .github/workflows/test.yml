@@ -32,6 +32,7 @@ jobs:
           WAVE_MINUTES: ${{ github.event.inputs.wave_minutes }}
           LOGIN_GAP_SECONDS: "90"
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_PASSWORD_008: ${{ secrets.TEST_PASSWORD_008 }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

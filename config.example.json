@@ -1,0 +1,21 @@
+{
+  "base_url": "https://your-site.com",
+  "verify_code": "tester-abc123",
+  "login": {
+    "path": "/login",
+    "email": "#email",
+    "password": "#password",
+    "submit": "button[type=submit]",
+    "success": ".dashboard"
+  },
+  "accounts": [
+    {"email": "bot1@test.com", "password": "Pass1"},
+    {"email": "bot2@test.com", "password": "Pass2"}
+  ],
+  "sections": ["/dashboard", "/profile", "/settings"],
+  "steps": [
+    {"do": "click", "selector": "#new-item"},
+    {"do": "fill", "selector": "#title", "value": "Test item"},
+    {"do": "expect_text", "text": "Saved"}
+  ]
+}

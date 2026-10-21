@@ -1,0 +1,31 @@
+name: Site test
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Site to test (leave empty to use config)
+        required: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4, 5]   # 5 runners x 10 bots = 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install playwright && playwright install --with-deps chromium
+      - run: python tester.py
+        env:
+          CONFIG: ${{ secrets.CONFIG }}
+          URL: ${{ github.event.inputs.url }}
+          GROUP: ${{ matrix.group }}
+          BOTS: "10"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.group }}
+          path: results_*.json

@@ -29,7 +29,7 @@ async def bot(p, browser, n):
     opts = {} if name == "Desktop Chrome" else p.devices[name]
     accs = CFG.get("accounts", [])
     acc = accs[gid % len(accs)] if accs else None
-        ctx = await browser.new_context(**{**opts, "user_agent": UA})
+    ctx = await browser.new_context(**{**opts, "user_agent": UA})
     page = await ctx.new_page()
     errors, problems, timings = [], [], {}
     page.on("console", lambda m: errors.append(m.text[:100]) if m.type == "error" else None)

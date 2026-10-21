@@ -10,12 +10,13 @@ BASE = (os.environ.get("URL") or CFG["base_url"]).rstrip("/")
 UA = "YourTesterBot/1.0 (+https://yoursite.com/bot)"  # honest name
 DEVICES = ["iPhone 13", "Pixel 5", "Desktop Chrome"]
 BLOCKED = re.compile(
-    r"\b(ads?|advert\w*|rewards?|watch|play|withdraw\w*|claim|coins?)\b", re.I)
+    r"\b(ads?|advert\w*|rewards?|watch|play|withdraw\w*|claim|coins?)\b", re.I
+)
 results = []
 
 
 async def verify_owner(ctx):
-    """Customer must put your code in https://their-site/tester-verify.txt"""
+    """Customer must put their code in https://their-site/tester-verify.txt"""
     code = CFG.get("verify_code")
     if not code:
         print("WARNING: no verify_code set. Only test sites you own.")
@@ -31,13 +32,16 @@ async def find_pages(page, limit):
     """Open the home page and collect internal links (same site only)."""
     await page.goto(BASE + "/", timeout=30000)
     hrefs = await page.eval_on_selector_all(
-        "a[href]", "els => els.map(e => e.href)")
+        "a[href]", "els => els.map(e => e.href)"
+    )
     found = []
     for h in hrefs:
         h = h.split("#")[0].split("?")[0]
         if h.startswith(BASE) and h != BASE + "/" and h != BASE:
             path = h[len(BASE):]
-            if path not in found and not path.endswith((".pdf", ".zip", ".png", ".jpg")):
+            if path not in found and not path.endswith(
+                (".pdf", ".zip", ".png", ".jpg")
+            ):
                 found.append(path)
     return ["/"] + found[:limit]
 
@@ -72,7 +76,8 @@ async def run_step(page, st, n):
         await page.wait_for_selector(f"text={st['text']}", timeout=10000)
     elif d == "expect_selector":  # presence only, never clicks
         await page.locator(st["selector"]).first.wait_for(
-            state="visible", timeout=10000)
+            state="visible", timeout=10000
+        )
     elif d == "scroll":
         for _ in range(st.get("times", 4)):
             await page.mouse.wheel(0, random.randint(300, 700))
@@ -115,8 +120,10 @@ async def bot(p, browser, n):
     errors, problems, timings, ads = [], [], {}, {}
     page.on("console", lambda m: errors.append(m.text[:100]) if m.type == "error" else None)
     try:
-        # bots start one after another, GAP seconds apart
-        await asyncio.sleep(gid * GAP + random.uniform(0, 5))
+        accounts = build_accounts()
+        has_acc = bool(CFG.get("login")) and gid < len(accounts)
+        # bots with an account start GAP seconds apart; bots without start now
+        await asyncio.sleep((gid * GAP if has_acc else 0) + random.uniform(0, 5))
         pages = CFG.get("sections", ["/"])
         if CFG.get("crawl"):
             pages = await find_pages(page, CFG.get("max_pages", 15))
@@ -133,8 +140,7 @@ async def bot(p, browser, n):
         for st in CFG.get("steps", []):
             await run_step(page, st, n)
         # logged-in part: each bot uses its own test account
-        accounts = build_accounts()
-        if CFG.get("login") and gid < len(accounts):
+        if has_acc:
             acc = accounts[gid]
             await do_login(page, acc["email"], acc["password"])
             for st in CFG.get("after_login_steps", []):
@@ -142,7 +148,7 @@ async def bot(p, browser, n):
     except Exception as e:
         problems.append(str(e)[:150])
     status = "PASS" if not problems else "FAIL"
-    print(f"[bot {gid}] {name} {status} pages={len(timings)} console_errors={len(errors)} ads={ads} {problems}")
+    print(f"[bot {gid}] {name} {status} pages={len(timings)} console_err={len(errors)}")
     results.append({"bot": gid, "device": name, "status": status,
                     "timings_ms": timings, "ad_slots": ads,
                     "console_errors": errors, "problems": problems})
@@ -168,5 +174,6 @@ async def main():
     print(f"GROUP {GROUP}: {passed}/{len(results)} bots passed")
     with open(f"results_{GROUP}.json", "w") as f:
         json.dump(results, f, indent=2)
+
 
 asyncio.run(main())
